@@ -1,0 +1,10 @@
+{
+  "port": 5001,
+  "id": "nodeC-1",
+  "dataDir": "./data/nodeC/1",
+  "peers": [
+    "http://localhost:5002",
+    "http://localhost:5003",
+    "http://localhost:5004"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "port": 3002,
+  "id": "nodeA-2",
+  "dataDir": "./data/nodeA/2",
+  "peers": [
+    "http://localhost:3001",
+    "http://localhost:3003",
+    "http://localhost:3004"
+  ]
+}
