@@ -29,7 +29,7 @@ class RaftNode {
         this.votedFor = this.id;
         this.votesReceived = 1;
 
-        logger.info(`[${this.id}] 🗳 Старт выборов (term ${this.currentTerm})`);
+        logger.info(`[${this.id}] 🗳 Start vote (term ${this.currentTerm})`);
 
         const voteRequest = {
             term: this.currentTerm,
@@ -41,10 +41,10 @@ class RaftNode {
                 const res = await axios.post(`${peer}/raft/vote`, voteRequest);
                 if (res.data.voteGranted) {
                     this.votesReceived++;
-                    logger.info(`[${this.id}] ✅ Получил голос от ${peer}`);
+                    logger.info(`[${this.id}] ✅ Recieved vote from ${peer}`);
                 }
             } catch {
-                logger.warn(`[${this.id}] ⚠️ Не получил ответ от ${peer}`);
+                logger.warn(`[${this.id}] ⚠️ No answer from ${peer}`);
             }
         }
 
@@ -52,14 +52,14 @@ class RaftNode {
         if (this.votesReceived >= majority) {
             this.becomeLeader();
         } else {
-            logger.info(`[${this.id}] ❌ Недостаточно голосов, остаюсь кандидатом`);
+            logger.info(`[${this.id}] ❌ Dont have ehough votes, I am not a candidate`);
             this.startElectionTimer(); // снова подождём и попробуем
         }
     }
 
     becomeLeader() {
         this.state = 'leader';
-        logger.info(`[${this.id}] 👑 Становлюсь лидером (term ${this.currentTerm})`);
+        logger.info(`[${this.id}] 👑 I am leader (term ${this.currentTerm})`);
         this.sendHeartbeats();
         this.heartbeatInterval = setInterval(() => this.sendHeartbeats(), 100);
     }
@@ -72,7 +72,7 @@ class RaftNode {
                     leaderId: this.id
                 });
             } catch {
-                logger.warn(`[${this.id}] ⚠️ Не могу отправить heartbeat → ${peer}`);
+                logger.warn(`[${this.id}] ⚠️ Cannot send heartbeat → ${peer}`);
             }
         }
     }
@@ -87,7 +87,7 @@ class RaftNode {
             this.state = 'follower';
             this.startElectionTimer();
             voteGranted = true;
-            logger.info(`[${this.id}] 🤝 Голосую за ${candidateId} (term ${term})`);
+            logger.info(`[${this.id}] 🤝 Vote for ${candidateId} (term ${term})`);
         }
 
         res.json({ voteGranted });
@@ -100,7 +100,7 @@ class RaftNode {
             this.votedFor = null;
             this.state = 'follower';
             this.startElectionTimer();
-            logger.info(`[${this.id}] ❤️ Получен heartbeat от ${leaderId} (term ${term})`);
+            logger.info(`[${this.id}] ❤️ Recieved heartbeat from ${leaderId} (term ${term})`);
         }
         res.sendStatus(200);
     }

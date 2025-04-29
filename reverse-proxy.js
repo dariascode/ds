@@ -99,7 +99,7 @@ app.get('/admin/status', async (req, res) => {
                 await axios.get(`${url}/key/ping`);
                 statusReport[node].push({ url, status: '🟢 OK' });
             } catch {
-                statusReport[node].push({ url, status: '🔴 Недоступен' });
+                statusReport[node].push({ url, status: '🔴 Not avaible' });
             }
         }
     }
@@ -108,5 +108,5 @@ app.get('/admin/status', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    logger.info(`🌐 Reverse Proxy запущен на порту ${PORT}`);
+    logger.info(`🌐 Reverse Proxy on port  ${PORT}`);
 });

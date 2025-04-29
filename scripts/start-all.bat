@@ -1,19 +1,19 @@
 @echo off
-REM Переходим в корень проекта
+
 cd /d C:\ds
 
-echo 🚀 Запуск всех 12 серверов...
+echo
 
 for %%N in (A B C) do (
     echo.
-    echo ——— Запускаем узел %%N ———
+    echo  %%N
     for %%I in (1 2 3 4) do (
-        echo   • сервер %%N-%%I…
+        echo    %%N  - %%I
         forever start server.js configs\node%%N\server%%I.json
         timeout /t 1 >nul
     )
 )
 
 echo.
-echo ✅ Все 12 серверов запущены!
+echo
 pause

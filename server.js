@@ -125,5 +125,5 @@ app.get('/raft/status', (req, res) => {
 // 🟢 Старт
 app.listen(PORT, async () => {
     await fs.ensureDir(dataDir);
-    logger.info(`[${selfId}] 🚀 Сервер запущен на порту ${PORT}`);
+    logger.info(`[${selfId}] 🚀 Server is running on ${PORT}`);
 });

@@ -1,3 +1,3 @@
 @echo off
-echo 🛑 Остановка всех серверов...
+echo
 forever stopall
