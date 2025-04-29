@@ -1,8 +1,9 @@
-@echo off
-set ROOT=C:\Users\Dasha\WebstormProjects\untitled2
-echo 🚀 Запуск узла B (4 сервера)...
+rem @echo off
+rem echo 🚀 Запуск узла B (4 сервера)...
 
-forever start %ROOT%\server.js %ROOT%\configs\nodeB\server1.json
-forever start %ROOT%\server.js %ROOT%\configs\nodeB\server2.json
-forever start %ROOT%\server.js %ROOT%\configs\nodeB\server3.json
-forever start %ROOT%\server.js %ROOT%\configs\nodeB\server4.json
+rem cd /d C:\ds
+
+rem forever start server.js configs\nodeB\server1.json
+rem forever start server.js configs\nodeB\server2.json
+rem forever start server.js configs\nodeB\server3.json
+rem forever start server.js configs\nodeB\server4.json
