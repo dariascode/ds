@@ -2,10 +2,74 @@
 const express = require('express');
 const httpProxy = require('http-proxy');
 const axios = require('axios');
-const logger = require('./logger');
+const logger = require('../logger/logger');
 const { nodes } = require('./proxyConfig');
 const crypto = require('crypto');
+const { Command } = require('commander');
+const { exec } = require('child_process');
+const path = require('path');
 
+
+
+const program = new Command();
+program
+    .name('reverse-proxy')
+    .description('A simple CLI tool')
+    .version('1.0.0');
+
+program
+    .command('start')
+    .description('Start all the nodes')
+    .action((name, options) => {
+        const configuration = require('../../configuration.json');
+        const nodes = configuration.nodes;
+        for(const node of nodes) {
+            console.log(`Starting node: ${node.id}...`);
+            for(const server of node.servers) {
+
+            }
+        }
+    });
+
+program
+    .command('stop')
+    .description('Stop the system')
+    .action((name, options) => {
+        const process = exec( `forever stopall`, (error, stdout, stderr) => {
+            if (error) {
+                console.error( error.message);
+                return;
+            }
+            if (stderr) {
+                console.error(stderr);
+                return;
+            }
+            console.log(stdout);
+        });
+    });
+
+program
+    .command('restart')
+    .description('restart the system')
+    .action((name, options) => {
+        console.log(`restart the system`);
+    });
+
+program
+    .command('status')
+    .description('system status')
+    .action((name, options) => {
+        console.log(`status`);
+    });
+
+program
+    .command('stats')
+    .description('system stats')
+    .action((name, options) => {
+        console.log(`system stats`);
+    });
+
+program.parse(process.argv);
 const app = express();
 const proxy = httpProxy.createProxyServer();
 const PORT = 8000;
@@ -107,6 +171,9 @@ app.get('/admin/status', async (req, res) => {
     res.json(statusReport);
 });
 
+/*
 app.listen(PORT, () => {
     logger.info(`🌐 Reverse Proxy on port  ${PORT}`);
 });
+
+ */

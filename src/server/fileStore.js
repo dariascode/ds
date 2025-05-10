@@ -2,7 +2,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const md5 = require('md5');
-const logger = require('./logger');
+const logger = require('../logger/logger');
 
 function getFilePath(dataDir, key) {
     return path.join(dataDir, `${md5(key)}.json`);

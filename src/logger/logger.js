@@ -11,7 +11,7 @@ const logger = createLogger({
     ),
     transports: [
         new transports.Console(),
-        new transports.File({ filename: 'logs/beedb1.log' }) // будет лежать в /logs
+        new transports.File({ filename: 'logs/beedbTEST.log' }) // будет лежать в /logs
     ],
 });
 

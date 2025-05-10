@@ -1,6 +1,6 @@
 // raft.js
 const axios = require('axios');
-const logger = require('./logger');
+const logger = require('../logger/logger');
 
 class RaftNode {
     constructor(config) {

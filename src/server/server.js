@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const fs = require('fs-extra');
 const fsSync = require('fs');
 const RaftNode = require('./raft');
-const logger = require('./logger');
+const logger = require('../logger/logger');
 const store = require('./fileStore');
 const path = require('path');
 
