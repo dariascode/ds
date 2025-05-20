@@ -4,7 +4,8 @@ const fs = require('fs-extra');
 const fsSync = require('fs');
 const axios = require('axios');
 const RaftNode = require('./raft');
-const logger = require('../logger/logger');
+const createLogger = require('../logger/logger');
+const logger = createLogger({ type: 'crud' });
 const store = require('./fileStore');
 const path = require('path');
 
@@ -49,14 +50,13 @@ app.get('/key/ping', (req, res) => {
 
 async function redirectIfNotLeader(req, res, next) {
     if (raft.state === 'leader') {
-        return next(); // всё ок — обрабатываем локально
+        return next();
     }
 
     if (!raft.leaderId) {
         return res.status(503).send('❌ Нет информации о лидере');
     }
 
-    // ⚠️ если лидером считает самого себя, не редиректим
     const selfUrl = `http://localhost:${PORT}`;
     if (raft.leaderId === selfUrl) {
         logger.warn(`[${selfId}] ⚠️ Я думаю, что я не лидер, но leaderId указывает на меня`);
@@ -70,7 +70,10 @@ async function redirectIfNotLeader(req, res, next) {
 
         const options = {
             method: req.method,
-            headers: req.headers,
+            headers: {
+                ...req.headers,
+                Connection: 'close' // фикс для закрытия keep-alive
+            },
             data: req.body,
             url: targetUrl,
             validateStatus: () => true
@@ -86,7 +89,11 @@ async function redirectIfNotLeader(req, res, next) {
 
 app.post('/key', redirectIfNotLeader, async (req, res) => {
     const { key, value } = req.body;
+
+    logger.info(`[${selfId}] 🔥 POST /key с телом: ${JSON.stringify(req.body)}`);
+
     if (!key || value === undefined) {
+        logger.warn(`[${selfId}] ❌ Неполные данные: key=${key}, value=${value}`);
         return res.status(400).send('❌ Нужны key и value');
     }
 
@@ -95,6 +102,8 @@ app.post('/key', redirectIfNotLeader, async (req, res) => {
         logger.info(`[${selfId}] ✅ Сохранено: ${key}`);
         res.send('Сохранено');
     } catch (err) {
+        logger.error(`[${selfId}] ❌ Ошибка при сохранении: ${err.message}`);
+        console.error(err);
         res.status(500).send('Ошибка при сохранении');
     }
 });

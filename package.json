@@ -26,5 +26,8 @@
     "http-proxy": "^1.18.1",
     "md5": "^2.3.0",
     "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
   }
 }

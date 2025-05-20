@@ -3,14 +3,17 @@ const axios = require('axios');
 const crypto = require('crypto');
 const path = require('path');
 const { exec } = require('child_process');
-const logger = require('../logger/logger');
+const createLogger = require('../logger/logger');
 const rootCfg = require('../../configuration.json');
+
+process.env.RP_ID = 'rp';
+const logger = createLogger({ type: 'rp' });
 
 const app = express();
 const PORT = 8000;
 let isShuttingDown = false;
 const rr = {};
-const leaders = {}; // для хранения лидеров по node
+const leaders = {};
 for (const node of rootCfg.nodes) rr[node.id] = 0;
 
 app.use(express.json());
@@ -27,14 +30,12 @@ app.use((req, res, next) => {
     next();
 });
 
-// Получение node id из ключа
 function getNodeByKey(key) {
     const hash = crypto.createHash('md5').update(key).digest('hex');
     const idx = parseInt(hash.slice(0, 8), 16) % rootCfg.nodes.length;
     return rootCfg.nodes[idx].id;
 }
 
-// Маршрут для регистрации лидера
 app.get('/set_master', (req, res) => {
     const { node_id, leader_url } = req.query;
     if (!node_id || !leader_url) {
@@ -50,7 +51,6 @@ app.get('/set_master', (req, res) => {
     res.json({ resp: { error: 0, data: 'Лидер зарегистрирован' } });
 });
 
-// Прокси-запрос с умной маршрутизацией на лидера
 async function proxyKeyRequest(req, res) {
     const key = req.body?.key || req.params?.key;
     if (!key) {
@@ -92,7 +92,6 @@ async function proxyKeyRequest(req, res) {
 
     try {
         logger.info(`📡 proxy → ${method} ${url} — key=${key}`);
-
         const result = await axios({
             method,
             url,
@@ -108,7 +107,6 @@ async function proxyKeyRequest(req, res) {
                 data: result.data || {}
             }
         });
-
     } catch (err) {
         if (err.response) {
             logger.error(`❌ Ответ с ошибкой от DN: ${JSON.stringify(err.response.data)}`);
@@ -164,7 +162,7 @@ async function startDN() {
         for (const srv of node.servers) {
             const srvScript = path.relative(baseDir, path.join(__dirname, '..', 'server', 'server.js'));
             const cfgFile = path.resolve(baseDir, node.configDirBase, `${srv.id}.json`);
-            const cmd = `npx forever start "${srvScript}" "${cfgFile}"`;
+            const cmd = `npx cross-env SERVER_ID=${srv.id} forever start "${srvScript}" "${cfgFile}"`;
             console.log(`🔧 CMD [${srv.id}]: ${cmd}`);
             await new Promise(resolve => {
                 exec(cmd, (err, stdout, stderr) => {

@@ -19,7 +19,7 @@ cli
     .description('Запустить кластер (RP + DN)')
     .action(() => {
         console.log('➡️  Старт RP через forever...');
-        exec(`npx forever start ${RP_SCRIPT}`, err => {
+        exec(`npx cross-env RP_ID=rp forever start ${RP_SCRIPT}`, err => {
             if (err) {
                 console.error('❌ RP не удалось запустить:', err.message);
                 process.exit(1);
