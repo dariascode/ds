@@ -1,17 +1,36 @@
 {
   "nodes": [
     {
-      "id": "Node A",
+      "id": "nodeA",
+      "dataDirBase": "./data/nodeA",
+      "configDirBase": "./configs/nodeA",
       "servers": [
-        {
-          "id": "Server A1",
-          "port": 3001,
-          "peers": [
-            "http://localhost:3002",
-            "http://localhost:3003",
-            "http://localhost:3004"
-          ]
-        }
+        { "id": "serverA1", "port": 3001 },
+        { "id": "serverA2", "port": 3002 },
+        { "id": "serverA3", "port": 3003 },
+        { "id": "serverA4", "port": 3004 }
+      ]
+    },
+    {
+      "id": "nodeB",
+      "dataDirBase": "./data/nodeB",
+      "configDirBase": "./configs/nodeB",
+      "servers": [
+        { "id": "serverB1", "port": 4001 },
+        { "id": "serverB2", "port": 4002 },
+        { "id": "serverB3", "port": 4003 },
+        { "id": "serverB4", "port": 4004 }
+      ]
+    },
+    {
+      "id": "nodeC",
+      "dataDirBase": "./data/nodeC",
+      "configDirBase": "./configs/nodeC",
+      "servers": [
+        { "id": "serverC1", "port": 5001 },
+        { "id": "serverC2", "port": 5002 },
+        { "id": "serverC3", "port": 5003 },
+        { "id": "serverC4", "port": 5004 }
       ]
     }
   ]

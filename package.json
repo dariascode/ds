@@ -2,7 +2,14 @@
   "name": "untitled2",
   "version": "1.0.0",
   "main": "index.js",
+  "bin": {
+    "beeDBd": "./beeDBd.js"
+  },
   "scripts": {
+    "start": "node beeDBd.js start",
+    "stop": "node beeDBd.js stop",
+    "status": "node beeDBd.js status",
+    "stats": "node beeDBd.js stats",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -10,10 +17,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "axios": "^1.8.4",
+    "axios": "^1.9.0",
     "body-parser": "^2.2.0",
     "commander": "^13.1.0",
     "express": "^5.1.0",
+    "forever": "^4.0.3",
     "fs-extra": "^11.3.0",
     "http-proxy": "^1.18.1",
     "md5": "^2.3.0",

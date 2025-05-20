@@ -1,6 +1,6 @@
 {
+  "id": "serverC1",
   "port": 5001,
-  "id": "nodeC-1",
   "dataDir": "./data/nodeC/1",
   "peers": [
     "http://localhost:5002",
