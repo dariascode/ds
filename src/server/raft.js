@@ -180,3 +180,4 @@ class RaftNode {
 }
 
 module.exports = RaftNode;
+// small test
