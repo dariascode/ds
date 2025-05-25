@@ -1,3 +1,4 @@
+// reverse-proxy.js (fixed headers + timeout)
 const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
@@ -5,6 +6,8 @@ const path = require('path');
 const { exec } = require('child_process');
 const createLogger = require('../logger/logger');
 const rootCfg = require('../../configuration.json');
+const jsonParser = express.json();
+
 
 process.env.RP_ID = 'rp';
 const logger = createLogger({ type: 'rp' });
@@ -16,7 +19,20 @@ const rr = {};
 const leaders = {};
 for (const node of rootCfg.nodes) rr[node.id] = 0;
 
-app.use(express.json());
+app.post('/db/c', jsonParser, proxyKeyRequest);
+app.post('/db/u', jsonParser, proxyKeyRequest);
+app.get('/db/r/:key', proxyKeyRequest);
+app.get('/db/d/:key', proxyKeyRequest);
+
+
+app.use((req, res, next) => {
+    if (req.method === 'GET') {
+        req.body = {}; // 💥 насильно очищаем тело GET-запроса
+    }
+    next();
+});
+
+
 
 app.use((req, res, next) => {
     if (isShuttingDown) {
@@ -92,21 +108,32 @@ async function proxyKeyRequest(req, res) {
 
     try {
         logger.info(`📡 proxy → ${method} ${url} — key=${key}`);
+
         const result = await axios({
             method,
             url,
             data,
-            headers: req.headers,
+            headers: {
+                'Content-Type': req.headers['content-type'] || 'application/json'
+            },
+            timeout: 2000,
             maxRedirects: 0,
             validateStatus: () => true
         });
 
-        res.status(result.status).json({
-            resp: {
-                error: 0,
-                data: result.data || {}
-            }
-        });
+        const isJson =
+            result.headers['content-type'] &&
+            result.headers['content-type'].includes('application/json');
+
+        if (isJson && typeof result.data === 'object') {
+            res.status(result.status).json({
+                resp: { error: 0, data: result.data }
+            });
+        } else {
+            res.status(result.status).json({
+                resp: { error: 0, data: { raw: result.data } }
+            });
+        }
     } catch (err) {
         if (err.response) {
             logger.error(`❌ Ответ с ошибкой от DN: ${JSON.stringify(err.response.data)}`);
@@ -129,10 +156,6 @@ async function proxyKeyRequest(req, res) {
     }
 }
 
-app.post('/db/c', proxyKeyRequest);
-app.get('/db/r/:key', proxyKeyRequest);
-app.post('/db/u', proxyKeyRequest);
-app.get('/db/d/:key', proxyKeyRequest);
 
 app.get('/admin/status', async (req, res) => {
     const report = {};
@@ -203,6 +226,8 @@ app.get('/admin/start', async (req, res) => {
     }
 });
 
+
+
 app.get('/admin/stop', async (req, res) => {
     isShuttingDown = true;
     try {
@@ -217,6 +242,9 @@ app.get('/admin/stop', async (req, res) => {
         });
     }
 });
+
+
+
 
 app.listen(PORT, () => {
     logger.info(`🌐 Reverse Proxy запущен на порту ${PORT}`);
