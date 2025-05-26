@@ -29,7 +29,7 @@ class RaftNode {
             candidate: '🔁',
             leader:   '👑'
         };
-        logger.info(`[${this.id}] ${roleIcons[state]} Роль: ${state.toUpperCase()} (term ${this.currentTerm})`);
+        logger.info(`[${this.id}] ${roleIcons[state]} Role: ${state.toUpperCase()} (term ${this.currentTerm})`);
     }
 
     startElectionTimer() {
@@ -46,7 +46,7 @@ class RaftNode {
         this.leaderId = null;
         this.logRole('candidate');
 
-        logger.info(`[${this.id}] 🗳 Старт выборов (term ${this.currentTerm})`);
+        logger.info(`[${this.id}] 🗳 Start election (term ${this.currentTerm})`);
 
         const voteRequest = {
             term: this.currentTerm,
@@ -61,12 +61,12 @@ class RaftNode {
                 });
                 if (res.data.voteGranted) {
                     this.votesReceived++;
-                    logger.info(`[${this.id}] ✅ Голос от ${peer}`);
+                    logger.info(`[${this.id}] ✅ Vote from ${peer}`);
                 } else {
-                    logger.debug(`[${this.id}] ❌ Отказ в голосе от ${peer}`);
+                    logger.debug(`[${this.id}] ❌ Reject from ${peer}`);
                 }
             } catch (err) {
-                logger.warn(`[${this.id}] ⚠️ Нет ответа от ${peer}: ${err.message}`);
+                logger.warn(`[${this.id}] ⚠️ No answer from ${peer}: ${err.message}`);
             }
         }
 
@@ -74,7 +74,7 @@ class RaftNode {
         if (this.votesReceived >= majority) {
             this.becomeLeader();
         } else {
-            logger.info(`[${this.id}] ❌ Недостаточно голосов, остаюсь follower`);
+            logger.info(`[${this.id}] ❌ Do not have enough votes, i am follower`);
             this.state = 'follower';
             this.logRole('follower');
             this.startElectionTimer();
@@ -92,9 +92,9 @@ class RaftNode {
                 leader_url: this.leaderId
             }
         }).then(() => {
-            logger.info(`[${this.id}] ✅ RP уведомлён: ${this.getNodeId()} → ${this.leaderId}`);
+            logger.info(`[${this.id}] ✅ RP notified: ${this.getNodeId()} → ${this.leaderId}`);
         }).catch((err) => {
-            logger.error(`[${this.id}] ❌ Ошибка уведомления RP: ${err.message}`);
+            logger.error(`[${this.id}] ❌ Failure of notifying RP: ${err.message}`);
         });
 
         this.sendHeartbeats();
@@ -128,16 +128,16 @@ class RaftNode {
                 if (res.status === 200) {
                     if (this.unreachablePeers.has(peer)) {
                         this.unreachablePeers.delete(peer);
-                        logger.info(`[${this.id}] 🔌 Восстановлено соединение с ${peer}`);
+                        logger.info(`[${this.id}] 🔌 Renewed connection with ${peer}`);
                     }
-                    logger.debug(`[${this.id}] ❤️ Heartbeat принят → ${peer}`);
+                    logger.debug(`[${this.id}] ❤️ Heartbeat received → ${peer}`);
                 } else {
-                    logger.warn(`[${this.id}] ⚠️ Heartbeat ответ ${res.status} от ${peer}`);
+                    logger.warn(`[${this.id}] ⚠️ Heartbeat answer ${res.status} от ${peer}`);
                 }
             } catch (err) {
                 if (!this.unreachablePeers.has(peer)) {
                     this.unreachablePeers.add(peer);
-                    logger.warn(`[${this.id}] 🚫 Потеряно соединение с ${peer}: ${err.message}`);
+                    logger.warn(`[${this.id}] 🚫 Lost connection with ${peer}: ${err.message}`);
                 }
             }
         }
@@ -155,7 +155,7 @@ class RaftNode {
             this.logRole('follower');
             this.startElectionTimer();
             voteGranted = true;
-            logger.info(`[${this.id}] 🤝 Голос за ${candidateId} (term ${term})`);
+            logger.info(`[${this.id}] 🤝 Vote for ${candidateId} (term ${term})`);
         }
 
         res.json({ voteGranted });
@@ -172,7 +172,7 @@ class RaftNode {
             this.leaderId = leaderId || null;
             if (becameFollower) this.logRole('follower');
             this.startElectionTimer();
-            logger.info(`[${this.id}] ❤️ Heartbeat от ${leaderId} (term ${term})`);
+            logger.info(`[${this.id}] ❤️ Heartbeat from ${leaderId} (term ${term})`);
         }
 
         res.status(200).json({ status: 'ok' });
@@ -180,4 +180,3 @@ class RaftNode {
 }
 
 module.exports = RaftNode;
-// small test

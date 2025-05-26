@@ -27,7 +27,7 @@ app.get('/db/d/:key', proxyKeyRequest);
 
 app.use((req, res, next) => {
     if (req.method === 'GET') {
-        req.body = {}; // 💥 насильно очищаем тело GET-запроса
+        req.body = {};
     }
     next();
 });
@@ -57,14 +57,14 @@ app.get('/set_master', (req, res) => {
     if (!node_id || !leader_url) {
         return res.status(400).json({
             resp: {
-                error: { code: 'eRPMD026E', errno: 26, message: 'Нужны node_id и leader_url' },
+                error: { code: 'eRPMD026E', errno: 26, message: 'Need node_id and leader_url' },
                 data: 0
             }
         });
     }
     leaders[node_id] = leader_url;
-    logger.info(`👑 Принят лидер: ${node_id} → ${leader_url}`);
-    res.json({ resp: { error: 0, data: 'Лидер зарегистрирован' } });
+    logger.info(`👑 Received leader: ${node_id} → ${leader_url}`);
+    res.json({ resp: { error: 0, data: 'Leader registered' } });
 });
 
 async function proxyKeyRequest(req, res) {
@@ -72,7 +72,7 @@ async function proxyKeyRequest(req, res) {
     if (!key) {
         return res.status(400).json({
             resp: {
-                error: { code: 'eRPMD024W', errno: 24, message: 'Нужен ключ' },
+                error: { code: 'eRPMD024W', errno: 24, message: 'Need key' },
                 data: 0
             }
         });
@@ -136,11 +136,11 @@ async function proxyKeyRequest(req, res) {
         }
     } catch (err) {
         if (err.response) {
-            logger.error(`❌ Ответ с ошибкой от DN: ${JSON.stringify(err.response.data)}`);
+            logger.error(`❌ Res with error from DN: ${JSON.stringify(err.response.data)}`);
         } else if (err.request) {
-            logger.error(`❌ DN не отвечает: ${err.message}`);
+            logger.error(`❌ DN does not respond:  ${err.message}`);
         } else {
-            logger.error(`❌ Сбой RP: ${err.message}`);
+            logger.error(`❌ RP failure:  ${err.message}`);
         }
 
         res.status(502).json({
@@ -176,7 +176,7 @@ app.get('/stats', async (req, res) => {
                 } catch (err) {
                     nodeStats.push({
                         id: server.id,
-                        error: '❌ недоступен'
+                        error: '❌ unavailable'
                     });
                 }
             }
@@ -187,7 +187,7 @@ app.get('/stats', async (req, res) => {
         res.json({ data: result });
     } catch (err) {
         res.status(500).json({
-            error: '❌ Ошибка агрегации статистики',
+            error: '❌ Error stats',
             message: err.message
         });
     }
@@ -216,7 +216,7 @@ app.get('/stats', (req, res) => {
 });
 
 async function startDN() {
-    console.log('➡️  Запуск DN-процессов...');
+    console.log('➡️  Start DNs');
     const baseDir = process.cwd();
     for (const node of rootCfg.nodes) {
         for (const srv of node.servers) {
@@ -228,31 +228,31 @@ async function startDN() {
                 exec(cmd, (err, stdout, stderr) => {
                     if (stdout) console.log(`📢 [${srv.id}] stdout:\n${stdout}`);
                     if (stderr) console.error(`⚠️ [${srv.id}] stderr:\n${stderr}`);
-                    if (err) console.error(`❌ [${srv.id}] Ошибка запуска:`, err.message);
-                    else console.log(`✅ [${srv.id}] успешно запущен`);
+                    if (err) console.error(`❌ [${srv.id}] Error starting: `, err.message);
+                    else console.log(`✅ [${srv.id}] succesfully started`);
                     resolve();
                 });
             });
             await new Promise(r => setTimeout(r, 300));
         }
     }
-    console.log('✅ Все DN-процессы запущены.');
+    console.log('✅ All DNs running');
 }
 
 function stopDN() {
-    console.log('➡️  Остановка DN...');
+    console.log('➡️  Stop DNs');
     exec('npx forever stopall', (err, stdout, stderr) => {
         if (stdout) console.log(`📢 stopall stdout:\n${stdout}`);
         if (stderr) console.error(`⚠️ stopall stderr:\n${stderr}`);
-        if (err) console.error('❌ Ошибка остановки DN:', err.message);
-        else console.log('✅ DN-процессы остановлены');
+        if (err) console.error('❌ Error stop DNs', err.message);
+        else console.log('✅ DNs stopped');
     });
 }
 
 app.get('/admin/start', async (req, res) => {
     try {
         await startDN();
-        res.json({ resp: { error: 0, data: { message: 'Запуск DN инициирован' } } });
+        res.json({ resp: { error: 0, data: { message: 'Start DN initiated' } } });
     } catch (e) {
         res.status(500).json({
             resp: {
@@ -269,7 +269,7 @@ app.get('/admin/stop', async (req, res) => {
     isShuttingDown = true;
     try {
         await stopDN();
-        res.json({ resp: { error: 0, data: { message: 'Остановка DN инициирована' } } });
+        res.json({ resp: { error: 0, data: { message: 'Stop DN initiated' } } });
     } catch (e) {
         res.status(500).json({
             resp: {
@@ -284,5 +284,5 @@ app.get('/admin/stop', async (req, res) => {
 
 
 app.listen(PORT, () => {
-    logger.info(`🌐 Reverse Proxy запущен на порту ${PORT}`);
+    logger.info(`🌐 Reverse Proxy is running on port ${PORT}`);
 });

@@ -12,7 +12,7 @@ const md5 = require('md5');
 
 const configPath = process.argv[2];
 if (!configPath) {
-    console.error('❌ Укажи путь к конфигу: node server.js configs/nodeA/server1.json');
+    console.error('❌ Path for config required:  node server.js configs/nodeA/server1.json');
     process.exit(1);
 }
 
@@ -38,13 +38,13 @@ const crudStats = {
 
 app.use((req, res, next) => {
     if (isShuttingDown) {
-        return res.status(503).send('⛔ Сервер выключается');
+        return res.status(503).send('⛔ Server is stopping');
     }
     activeRequests++;
     res.on('finish', () => {
         activeRequests--;
         if (isShuttingDown && activeRequests === 0) {
-            logger.info(`[${selfId}] ✅ Все операции завершены. Завершаем процесс.`);
+            logger.info(`[${selfId}] ✅ All of the processes are done. Stop the server`);
             process.exit(0);
         }
     });
@@ -52,7 +52,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/key/ping', (req, res) => {
-    res.send('🟢 Я жив!');
+    res.send('🟢 ALIVE!');
 });
 
 app.get('/whoami', (req, res) => {
@@ -111,7 +111,7 @@ app.post('/internal/abort', jsonParser, async (req, res) => {
     }
 });
 
-// 🔁 helper для двухфазного коммита
+
 async function twoPhaseCommit(followers, key, value, operation) {
     const prepare = await Promise.allSettled(
         followers.map(url => axios.post(`${url}/internal/prepare`, { key, value, operation }, { timeout: 1500 }))
@@ -134,10 +134,10 @@ app.post('/internal/replicate', jsonParser, async (req, res) => {
     try {
         await store.saveKeyValue(dataDir, key, value);
         crudStats.create++;
-        logger.info(`[${selfId}] 📄 Репликация ключа ${key}`);
+        logger.info(`[${selfId}] 📄 Key replication ${key}`);
         res.send({ status: 'ok' });
     } catch (err) {
-        logger.error(`[${selfId}] ❌ Ошибка репликации: ${err.message}`);
+        logger.error(`[${selfId}] ❌ Replication error: ${err.message}`);
         res.status(500).send({ status: 'error' });
     }
 });
@@ -147,10 +147,10 @@ app.post('/internal/delete', jsonParser, async (req, res) => {
     try {
         await store.deleteKeyValue(dataDir, key);
         crudStats.delete++;
-        logger.info(`[${selfId}] 🧨 Репликация удаления ${key}`);
+        logger.info(`[${selfId}] 🧨 Delete replication ${key}`);
         res.send({ status: 'ok' });
     } catch (err) {
-        logger.error(`[${selfId}] ❌ Ошибка при удалении реплики: ${err.message}`);
+        logger.error(`[${selfId}] ❌ Error of replication delete: ${err.message}`);
         res.status(500).send({ status: 'error' });
     }
 });
@@ -159,25 +159,25 @@ async function redirectIfNotLeader(req, res, next) {
     logger.info(`[${selfId}] 🧭 redirectIfNotLeader → state: ${raft.state}, leaderId: ${raft.leaderId}`);
 
     if (raft.state === 'leader') {
-        logger.info(`[${selfId}] ✅ Я лидер, продолжаем`);
+        logger.info(`[${selfId}] ✅ I am leader, going on`);
         return next();
     }
 
     if (!raft.leaderId) {
-        logger.warn(`[${selfId}] ❌ Нет информации о лидере`);
-        return res.status(503).send('❌ Нет информации о лидере');
+        logger.warn(`[${selfId}] ❌ No info about leader`);
+        return res.status(503).send('❌ No info about leader');
     }
 
     const selfUrl = `http://localhost:${PORT}`;
     if (raft.leaderId === selfUrl) {
-        logger.warn(`[${selfId}] ⚠️ Я думаю, что я не лидер, но leaderId указывает на меня`);
+        logger.warn(`[${selfId}] ⚠️ I am not a leader but leader ID mentions me`);
         return next();
     }
 
     try {
         const leaderBase = raft.leaderId.replace(/\/$/, '');
         const targetUrl = leaderBase + req.originalUrl;
-        logger.warn(`[${selfId}] 🔀 Перенаправляем на лидера: ${targetUrl}`);
+        logger.warn(`[${selfId}] 🔀 Redirect on leader: ${targetUrl}`);
 
         const result = await axios({
             method: req.method,
@@ -189,8 +189,8 @@ async function redirectIfNotLeader(req, res, next) {
 
         res.status(result.status).set(result.headers).send(result.data);
     } catch (err) {
-        logger.error(`[${selfId}] ❌ Не удалось перенаправить на лидера: ${err.message}`);
-        res.status(502).send('Ошибка при редиректе на лидера');
+        logger.error(`[${selfId}] ❌ Failure of redirect: ${err.message}`);
+        res.status(502).send('Failure in redirect');
     }
 }
 
@@ -218,13 +218,13 @@ app.post('/key', redirectIfNotLeader, jsonParser, async (req, res) => {
 
     await store.saveKeyValue(dataDir, key, value);
     crudStats.create++;
-    logger.info(`[${selfId}] ✅ Лидер сохранил ключ: ${key}`);
+    logger.info(`[${selfId}] ✅ Leader saved the key ${key}`);
 
     res.json({
         resp: {
             error: 0,
             data: {
-                message: 'Сохранено и реплицировано',
+                message: 'Saved and replicated',
                 key,
                 node: nodeId
             }
@@ -238,19 +238,19 @@ app.get('/key/:key', async (req, res) => {
     try {
         const exists = await store.keyExists(dataDir, key);
         if (!exists) {
-            return res.status(404).json({ error: 0, data: '❌ Ключ не найден' });
+            return res.status(404).json({ error: 0, data: '❌ Key is not found' });
         }
 
         const data = await store.readKeyValue(dataDir, key);
         crudStats.read++;
         if (!data || typeof data !== 'object' || !data.key || !data.value) {
-            logger.error(`[${selfId}] ❌ Невалидный формат файла для ключа ${key}`);
-            return res.status(500).json({ error: 1, message: 'Невалидный JSON' });
+            logger.error(`[${selfId}] ❌ Invalid format ${key}`);
+            return res.status(500).json({ error: 1, message: 'Invalid JSON' });
         }
 
         res.json(data);
     } catch (err) {
-        logger.error(`[${selfId}] ❌ Ошибка при чтении ключа: ${err.message}`);
+        logger.error(`[${selfId}] ❌ Failure in reading key: ${err.message}`);
         res.status(500).json({ error: 1, message: err.message });
     }
 });
@@ -277,13 +277,13 @@ app.delete('/key/:key', redirectIfNotLeader, async (req, res) => {
 
     await store.deleteKeyValue(dataDir, key);
     crudStats.delete++;
-    logger.info(`[${selfId}] 🗑 Лидер удалил ключ: ${key}`);
+    logger.info(`[${selfId}] 🗑 Leader deleted the key: ${key}`);
 
     res.json({
         resp: {
             error: 0,
             data: {
-                message: 'Удалено и синхронизировано',
+                message: 'Deleted and replicated',
                 key,
                 node: nodeId
             }
@@ -310,9 +310,9 @@ app.get('/raft/status', (req, res) => {
 });
 
 app.get('/internal/shutdown', (req, res) => {
-    logger.info(`[${selfId}] ⛔ Получен сигнал остановки`);
+    logger.info(`[${selfId}] ⛔ Received the stop signal`);
     isShuttingDown = true;
-    res.send('Остановка начата, ждём завершения операций...');
+    res.send('Start of stop');
 });
 
 app.get('/stats', (req, res) => {

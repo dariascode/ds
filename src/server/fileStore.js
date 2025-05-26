@@ -13,9 +13,9 @@ async function saveKeyValue(dataDir, key, value) {
     const filePath = getFilePath(dataDir, key);
     try {
         await fs.outputJson(filePath, { key, value });
-        logger.info(`💾 Сохранено: ${key} → ${filePath}`);
+        logger.info(`💾 Saved:  ${key} → ${filePath}`);
     } catch (err) {
-        logger.error(`❌ Ошибка при сохранении ${key}: ${err}`);
+        logger.error(`❌ Error in saving: ${key}: ${err}`);
         throw err;
     }
 }
@@ -24,10 +24,10 @@ async function readKeyValue(dataDir, key) {
     const filePath = getFilePath(dataDir, key);
     try {
         const data = await fs.readJson(filePath);
-        logger.info(`📖 Прочитано: ${key} → ${filePath}`);
+        logger.info(`📖 Read:  ${key} → ${filePath}`);
         return data;
     } catch (err) {
-        logger.error(`❌ Ошибка при чтении ${key}: ${err}`);
+        logger.error(`❌ Error in reading:  ${key}: ${err}`);
         throw err;
     }
 }
@@ -36,9 +36,9 @@ async function deleteKeyValue(dataDir, key) {
     const filePath = getFilePath(dataDir, key);
     try {
         await fs.remove(filePath);
-        logger.info(`🗑 Удалён ключ: ${key}`);
+        logger.info(`🗑 Key is deleted:  ${key}`);
     } catch (err) {
-        logger.error(`❌ Ошибка при удалении ${key}: ${err}`);
+        logger.error(`❌ Error in deleting:  ${key}: ${err}`);
         throw err;
     }
 }
