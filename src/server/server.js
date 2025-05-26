@@ -8,6 +8,7 @@ const createLogger = require('../logger/logger');
 const logger = createLogger({ type: 'crud' });
 const store = require('./fileStore');
 const path = require('path');
+const md5 = require('md5');
 
 const configPath = process.argv[2];
 if (!configPath) {
@@ -62,6 +63,71 @@ app.get('/whoami', (req, res) => {
         leader: raft.leaderId
     });
 });
+
+app.post('/internal/prepare', jsonParser, async (req, res) => {
+    const { key, value, operation } = req.body;
+    try {
+        const tmp = path.join(dataDir, `${md5(key)}.${operation}.prepare`);
+        await fs.outputJson(tmp, { key, value });
+        logger.info(`[${selfId}] 🟡 PREPARE ${operation} ${key}`);
+        res.send({ status: 'ready' });
+    } catch (err) {
+        logger.error(`[${selfId}] ❌ PREPARE FAILED: ${err.message}`);
+        res.status(500).send({ status: 'fail' });
+    }
+});
+
+app.post('/internal/commit', jsonParser, async (req, res) => {
+    const { key, operation } = req.body;
+    try {
+        const tmp = path.join(dataDir, `${md5(key)}.${operation}.prepare`);
+        const { value } = await fs.readJson(tmp);
+        if (operation === 'create' || operation === 'update') {
+            await store.saveKeyValue(dataDir, key, value);
+            crudStats.create++;
+        } else if (operation === 'delete') {
+            await store.deleteKeyValue(dataDir, key);
+            crudStats.delete++;
+        }
+        await fs.remove(tmp);
+        logger.info(`[${selfId}] ✅ COMMIT ${operation} ${key}`);
+        res.send({ status: 'ok' });
+    } catch (err) {
+        logger.error(`[${selfId}] ❌ COMMIT FAILED: ${err.message}`);
+        res.status(500).send({ status: 'fail' });
+    }
+});
+
+app.post('/internal/abort', jsonParser, async (req, res) => {
+    const { key, operation } = req.body;
+    try {
+        const tmp = path.join(dataDir, `${md5(key)}.${operation}.prepare`);
+        await fs.remove(tmp);
+        logger.warn(`[${selfId}] 🛑 ABORT ${operation} ${key}`);
+        res.send({ status: 'aborted' });
+    } catch (err) {
+        logger.error(`[${selfId}] ❌ ABORT FAILED: ${err.message}`);
+        res.status(500).send({ status: 'fail' });
+    }
+});
+
+// 🔁 helper для двухфазного коммита
+async function twoPhaseCommit(followers, key, value, operation) {
+    const prepare = await Promise.allSettled(
+        followers.map(url => axios.post(`${url}/internal/prepare`, { key, value, operation }, { timeout: 1500 }))
+    );
+    const failed = prepare.filter(r => r.status !== 'fulfilled' || r.value.data.status !== 'ready');
+    if (failed.length > 0) {
+        await Promise.allSettled(
+            followers.map(url => axios.post(`${url}/internal/abort`, { key, operation }, { timeout: 1000 }))
+        );
+        return false;
+    }
+    await Promise.all(
+        followers.map(url => axios.post(`${url}/internal/commit`, { key, operation }, { timeout: 1500 }))
+    );
+    return true;
+}
 
 app.post('/internal/replicate', jsonParser, async (req, res) => {
     const { key, value } = req.body;
@@ -130,68 +196,40 @@ async function redirectIfNotLeader(req, res, next) {
 
 app.post('/key', redirectIfNotLeader, jsonParser, async (req, res) => {
     const { key, value } = req.body;
+    logger.info(`[${selfId}] 🔥 POST /key: ${JSON.stringify(req.body)}`);
+    if (!key || value === undefined) return res.status(400).send('❌ Нужны key и value');
 
-    logger.info(`[${selfId}] 🔥 POST /key с телом: ${JSON.stringify(req.body)}`);
+    const nodeId = raft.getNodeId();
+    const node = require('../../configuration.json').nodes.find(n => n.id === nodeId);
+    const myUrl = `http://localhost:${PORT}`;
+    const followers = node.servers.map(s => `http://localhost:${s.port}`).filter(url => url !== myUrl);
 
-    if (!key || value === undefined) {
-        logger.warn(`[${selfId}] ❌ Неполные данные: key=${key}, value=${value}`);
-        return res.status(400).send('❌ Нужны key и value');
-    }
-
-    try {
-        await store.saveKeyValue(dataDir, key, value);
-        crudStats.create++;
-        logger.info(`[${selfId}] ✅ Лидер сохранил: ${key}`);
-
-        const nodeId = raft.getNodeId();
-        const node = require('../../configuration.json').nodes.find(n => n.id === nodeId);
-        const myUrl = `http://localhost:${PORT}`;
-        const followers = node.servers.map(s => `http://localhost:${s.port}`).filter(url => url !== myUrl);
-
-        const results = await Promise.allSettled(
-            followers.map(url => axios.post(`${url}/internal/replicate`, { key, value }, {
-                timeout: 1500,
-                headers: { Connection: 'close' }
-            }))
-        );
-
-        const failed = results.filter(r => r.status !== 'fulfilled');
-        if (failed.length > 0) {
-            return res.status(207).json({
-                resp: {
-                    error: {
-                        code: 'eREPL01',
-                        errno: 207,
-                        message: 'Не все фолловеры подтвердили сохранение'
-                    },
-                    data: 0
-                }
-            });
-        }
-
-        res.json({
-            resp: {
-                error: 0,
-                data: {
-                    message: 'Сохранено и реплицировано',
-                    key,
-                    node: nodeId
-                }
-            }
-        });
-    } catch (err) {
-        logger.error(`[${selfId}] ❌ Ошибка при сохранении: ${err.message}`);
-        res.status(500).json({
+    const success = await twoPhaseCommit(followers, key, value, 'create');
+    if (!success) {
+        return res.status(409).json({
             resp: {
                 error: {
-                    code: 'eSAVE01',
-                    errno: 500,
-                    message: err.message
+                    code: 'ePREPFAIL', errno: 409, message: 'prepare phase failed'
                 },
                 data: 0
             }
         });
     }
+
+    await store.saveKeyValue(dataDir, key, value);
+    crudStats.create++;
+    logger.info(`[${selfId}] ✅ Лидер сохранил ключ: ${key}`);
+
+    res.json({
+        resp: {
+            error: 0,
+            data: {
+                message: 'Сохранено и реплицировано',
+                key,
+                node: nodeId
+            }
+        }
+    });
 });
 
 app.get('/key/:key', async (req, res) => {
@@ -220,64 +258,39 @@ app.get('/key/:key', async (req, res) => {
 app.delete('/key/:key', redirectIfNotLeader, async (req, res) => {
     const key = req.params.key;
 
-    try {
-        await store.deleteKeyValue(dataDir, key);
-        crudStats.delete++;
-        logger.info(`[${selfId}] 🗑 Удалён локально: ${key}`);
+    const nodeId = raft.getNodeId();
+    const node = require('../../configuration.json').nodes.find(n => n.id === nodeId);
+    const myUrl = `http://localhost:${PORT}`;
+    const followers = node.servers.map(s => `http://localhost:${s.port}`).filter(url => url !== myUrl);
 
-        const nodeId = raft.getNodeId();
-        const node = require('../../configuration.json').nodes.find(n => n.id === nodeId);
-        const myUrl = `http://localhost:${PORT}`;
-        const followers = node.servers.map(s => `http://localhost:${s.port}`).filter(url => url !== myUrl);
-
-        const results = await Promise.allSettled(
-            followers.map(url =>
-                axios.post(`${url}/internal/delete`, { key }, {
-                    timeout: 1500,
-                    headers: { Connection: 'close' }
-                })
-            )
-        );
-
-        const failed = results.filter(r => r.status !== 'fulfilled');
-        if (failed.length > 0) {
-            logger.warn(`[${selfId}] ⚠️ Репликация удаления частично не удалась (${failed.length})`);
-            return res.status(207).json({
-                resp: {
-                    error: {
-                        code: 'eREPLDEL01',
-                        errno: 207,
-                        message: 'Удалено, но не у всех фолловеров'
-                    },
-                    data: 0
-                }
-            });
-        }
-
-        res.json({
-            resp: {
-                error: 0,
-                data: {
-                    message: 'Удалено и синхронизировано',
-                    key,
-                    node: nodeId
-                }
-            }
-        });
-    } catch (err) {
-        logger.error(`[${selfId}] ❌ Ошибка удаления: ${err.message}`);
-        res.status(500).json({
+    const success = await twoPhaseCommit(followers, key, null, 'delete');
+    if (!success) {
+        return res.status(409).json({
             resp: {
                 error: {
-                    code: 'eDEL01',
-                    errno: 500,
-                    message: err.message
+                    code: 'eDELFAIL', errno: 409, message: 'prepare phase failed'
                 },
                 data: 0
             }
         });
     }
+
+    await store.deleteKeyValue(dataDir, key);
+    crudStats.delete++;
+    logger.info(`[${selfId}] 🗑 Лидер удалил ключ: ${key}`);
+
+    res.json({
+        resp: {
+            error: 0,
+            data: {
+                message: 'Удалено и синхронизировано',
+                key,
+                node: nodeId
+            }
+        }
+    });
 });
+
 
 app.post('/raft/vote', jsonParser, (req, res) => {
     raft.handleVoteRequest(req, res);
