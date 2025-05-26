@@ -74,16 +74,21 @@ cli
 // Команда status: статус DN через RP
 cli
     .command('status')
-    .description('Показать статус DN')
+    .description('Показать статус всех DN по узлам')
     .action(async () => {
         try {
             const r = await axios.get(`${RP_URL}/admin/status`);
-            console.dir(r.data.data, { depth: null });
+            const data = r.data?.resp?.data || r.data?.data;
+            for (const nodeId in data) {
+                console.log(`\n📦 Узел ${nodeId}:`);
+                console.table(data[nodeId]);
+            }
         } catch (e) {
             console.error('❌ Не удалось получить статус:', e.message);
             process.exit(1);
         }
     });
+
 
 // Команда stats: статистика DB через RP
 cli
