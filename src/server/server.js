@@ -28,6 +28,13 @@ const jsonParser = bodyParser.json();
 let isShuttingDown = false;
 let activeRequests = 0;
 
+const crudStats = {
+    create: 0,
+    read: 0,
+    delete: 0
+};
+
+
 app.use((req, res, next) => {
     if (isShuttingDown) {
         return res.status(503).send('⛔ Сервер выключается');
@@ -60,6 +67,7 @@ app.post('/internal/replicate', jsonParser, async (req, res) => {
     const { key, value } = req.body;
     try {
         await store.saveKeyValue(dataDir, key, value);
+        crudStats.create++;
         logger.info(`[${selfId}] 📄 Репликация ключа ${key}`);
         res.send({ status: 'ok' });
     } catch (err) {
@@ -72,6 +80,7 @@ app.post('/internal/delete', jsonParser, async (req, res) => {
     const { key } = req.body;
     try {
         await store.deleteKeyValue(dataDir, key);
+        crudStats.delete++;
         logger.info(`[${selfId}] 🧨 Репликация удаления ${key}`);
         res.send({ status: 'ok' });
     } catch (err) {
@@ -131,6 +140,7 @@ app.post('/key', redirectIfNotLeader, jsonParser, async (req, res) => {
 
     try {
         await store.saveKeyValue(dataDir, key, value);
+        crudStats.create++;
         logger.info(`[${selfId}] ✅ Лидер сохранил: ${key}`);
 
         const nodeId = raft.getNodeId();
@@ -194,6 +204,7 @@ app.get('/key/:key', async (req, res) => {
         }
 
         const data = await store.readKeyValue(dataDir, key);
+        crudStats.read++;
         if (!data || typeof data !== 'object' || !data.key || !data.value) {
             logger.error(`[${selfId}] ❌ Невалидный формат файла для ключа ${key}`);
             return res.status(500).json({ error: 1, message: 'Невалидный JSON' });
@@ -211,6 +222,7 @@ app.delete('/key/:key', redirectIfNotLeader, async (req, res) => {
 
     try {
         await store.deleteKeyValue(dataDir, key);
+        crudStats.delete++;
         logger.info(`[${selfId}] 🗑 Удалён локально: ${key}`);
 
         const nodeId = raft.getNodeId();
@@ -289,6 +301,14 @@ app.get('/internal/shutdown', (req, res) => {
     isShuttingDown = true;
     res.send('Остановка начата, ждём завершения операций...');
 });
+
+app.get('/stats', (req, res) => {
+    res.json({
+        id: selfId,
+        stats: crudStats
+    });
+});
+
 
 app.listen(PORT, async () => {
     await fs.ensureDir(dataDir);

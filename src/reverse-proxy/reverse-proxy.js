@@ -156,6 +156,43 @@ async function proxyKeyRequest(req, res) {
     }
 }
 
+app.get('/stats', async (req, res) => {
+    try {
+        const config = require('../../configuration.json');
+        const nodes = config.nodes;
+        const result = {};
+
+        for (const node of nodes) {
+            const nodeStats = [];
+
+            for (const server of node.servers) {
+                const url = `http://localhost:${server.port}/stats`;
+                try {
+                    const response = await axios.get(url, { timeout: 1000 });
+                    nodeStats.push({
+                        id: response.data.id,
+                        stats: response.data.stats
+                    });
+                } catch (err) {
+                    nodeStats.push({
+                        id: server.id,
+                        error: '❌ недоступен'
+                    });
+                }
+            }
+
+            result[node.id] = nodeStats;
+        }
+
+        res.json({ data: result });
+    } catch (err) {
+        res.status(500).json({
+            error: '❌ Ошибка агрегации статистики',
+            message: err.message
+        });
+    }
+});
+
 
 app.get('/admin/status', async (req, res) => {
     const report = {};
