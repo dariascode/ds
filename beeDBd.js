@@ -52,7 +52,7 @@ cli
                     console.error('❌ RP не остановлен:', err.message);
                     process.exit(1);
                 }
-                console.log('✅ PP is stopped');
+                console.log('✅ RP is stopped');
             });
         }
     });
