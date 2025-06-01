@@ -17,7 +17,7 @@ class RaftNode {
 
         this.electionTimeout = null;
         this.heartbeatInterval = null;
-        this.unreachablePeers = new Set(); // <--- добавлено
+        this.unreachablePeers = new Set();
 
         this.logRole('follower');
         this.startElectionTimer();
