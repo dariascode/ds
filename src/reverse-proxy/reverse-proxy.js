@@ -30,13 +30,11 @@ app.use((req, res, next) => {
     next();
 });
 
-
-
 app.use((req, res, next) => {
     if (isShuttingDown) {
         return res.status(503).json({
             resp: {
-                error: { code: 'eRPMD023W', errno: 23, message: 'Система выключается' },
+                error: { code: 'eRPMD023W', errno: 23, message: 'System is stopping' },
                 data: 0
             }
         });
@@ -256,7 +254,6 @@ app.get('/admin/start', async (req, res) => {
         });
     }
 });
-
 
 
 app.get('/admin/stop', async (req, res) => {
