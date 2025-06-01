@@ -17,20 +17,33 @@ cli
         console.log('➡️  Start with forever...');
         exec(`npx cross-env RP_ID=rp forever start ${RP_SCRIPT}`, err => {
             if (err) {
-                console.error('❌ PR is failed: ', err.message);
+                console.error('❌ RP failed to start: ', err.message);
                 process.exit(1);
             }
-            console.log(`✅ RP is started, wait for:  ${STARTUP_WAIT_MS / 1000}s `);
+            console.log(`✅ RP is started, wait for: ${STARTUP_WAIT_MS / 1000}s`);
             setTimeout(async () => {
                 try {
                     const r = await axios.get(`${RP_URL}/admin/start`);
-                    console.log('✅', r.data.data.message);
+                    const message = r?.data?.data?.message || '[No message returned]';
+                    console.log('✅', message);
                 } catch (e) {
-                    const info = e.response ? JSON.stringify(e.response.data) : e.message;
-                    console.error('❌ Error of starting: ', info);
+                    let info;
+                    if (e.response && e.response.data) {
+                        try {
+                            info = typeof e.response.data === 'string'
+                                ? e.response.data
+                                : JSON.stringify(e.response.data, null, 2);
+                        } catch (err) {
+                            info = '[Cannot stringify response data]';
+                        }
+                    } else {
+                        info = e.message || 'Unknown error';
+                    }
+                    console.error('❌ Error of starting:', info);
                     process.exit(1);
                 }
             }, STARTUP_WAIT_MS);
+
         });
     });
 
@@ -41,15 +54,27 @@ cli
     .action(async () => {
         try {
             const r = await axios.get(`${RP_URL}/admin/stop`);
-            console.log('✅', r.data.data.message);
+            const message = r?.data?.data?.message || '[No message returned]';
+            console.log('✅', message);
         } catch (e) {
-            const info = e.response ? JSON.stringify(e.response.data) : e.message;
-            console.error('❌ Error of stop DN', info);
+            let info;
+            if (e.response && e.response.data) {
+                try {
+                    info = typeof e.response.data === 'string'
+                        ? e.response.data
+                        : JSON.stringify(e.response.data, null, 2);
+                } catch (err) {
+                    info = '[Cannot stringify response data]';
+                }
+            } else {
+                info = e.message || 'Unknown error';
+            }
+            console.error('❌ Error of stop DN:', info);
         } finally {
             console.log('➡️  Stop RP');
             exec(`npx forever stop ${RP_SCRIPT}`, err => {
                 if (err) {
-                    console.error('❌ RP не остановлен:', err.message);
+                    console.error('❌ RP is not stopped:', err.message);
                     process.exit(1);
                 }
                 console.log('✅ RP is stopped');
@@ -57,7 +82,8 @@ cli
         }
     });
 
-// Команда restart: stop + пауза + start
+
+
 cli
     .command('restart')
     .description('Restart RP and DN')
@@ -67,7 +93,7 @@ cli
         await cli.parseAsync(['node', 'beeDBd.js', 'start']);
     });
 
-// Команда status: статус DN через RP
+
 cli
     .command('status')
     .description('Status of nodes')
@@ -76,7 +102,7 @@ cli
             const r = await axios.get(`${RP_URL}/admin/status`);
             const data = r.data?.resp?.data || r.data?.data;
             for (const nodeId in data) {
-                console.log(`\n📦 Узел ${nodeId}:`);
+                console.log(`\n📦 Node ${nodeId}:`);
                 console.table(data[nodeId]);
             }
         } catch (e) {
@@ -85,8 +111,6 @@ cli
         }
     });
 
-
-// Команда stats: статистика DB через RP
 cli
     .command('stats')
     .description('Stats of nodes')

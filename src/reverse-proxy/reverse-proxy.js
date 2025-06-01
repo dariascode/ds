@@ -1,4 +1,3 @@
-// reverse-proxy.js (fixed headers + timeout)
 const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
@@ -7,7 +6,6 @@ const { exec } = require('child_process');
 const createLogger = require('../logger/logger');
 const rootCfg = require('../../configuration.json');
 const jsonParser = express.json();
-
 
 process.env.RP_ID = 'rp';
 const logger = createLogger({ type: 'rp' });
