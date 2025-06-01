@@ -1,4 +1,0 @@
-.\scripts\start-all.bat
-forever stopall
-forever list
-node reverse-proxy.js
