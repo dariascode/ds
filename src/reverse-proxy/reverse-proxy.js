@@ -209,10 +209,6 @@ app.get('/admin/status', async (req, res) => {
     res.json({ resp: { error: 0, data: report } });
 });
 
-app.get('/stats', (req, res) => {
-    res.json({ resp: { error: 0, data: { stats: 'not implemented' } } });
-});
-
 async function startDN() {
     console.log('➡️  Start DNs');
     const baseDir = process.cwd();
