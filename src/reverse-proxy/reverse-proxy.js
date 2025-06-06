@@ -64,8 +64,8 @@ app.get('/set_master', (req, res) => {
 });
 
 async function proxyKeyRequest(req, res) {
-    const key = req.body?.key || req.params?.key;
-    if (!key) {
+    let rawKey = req.body?.key ?? req.params?.key;
+    if (rawKey === undefined) {
         return res.status(400).json({
             resp: {
                 error: { code: 'eRPMD024W', errno: 24, message: 'Need key' },
@@ -73,6 +73,14 @@ async function proxyKeyRequest(req, res) {
             }
         });
     }
+
+
+    if (typeof rawKey === 'object') {
+        rawKey = JSON.stringify(rawKey);
+    } else {
+        rawKey = String(rawKey);
+    }
+    const key = rawKey;
 
     const nodeId = getNodeByKey(key);
     const node = rootCfg.nodes.find(n => n.id === nodeId);
@@ -151,6 +159,7 @@ async function proxyKeyRequest(req, res) {
         });
     }
 }
+
 
 app.get('/stats', async (req, res) => {
     try {
