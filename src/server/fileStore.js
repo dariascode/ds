@@ -5,9 +5,16 @@ const md5 = require('md5');
 const createLogger = require('../logger/logger');
 const logger = createLogger({ type: 'crud' });
 
-function getFilePath(dataDir, key) {
-    return path.join(dataDir, `${md5(key)}.json`);
+function normalizeKey(key) {
+    if (typeof key === 'object') return JSON.stringify(key);
+    return String(key);
 }
+
+function getFilePath(dataDir, key) {
+    const normKey = normalizeKey(key);
+    return path.join(dataDir, `${md5(normKey)}.json`);
+}
+
 
 async function saveKeyValue(dataDir, key, value) {
     const filePath = getFilePath(dataDir, key);

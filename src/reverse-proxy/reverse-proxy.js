@@ -19,16 +19,8 @@ for (const node of rootCfg.nodes) rr[node.id] = 0;
 
 app.post('/db/c', jsonParser, proxyKeyRequest);
 app.post('/db/u', jsonParser, proxyKeyRequest);
-app.get('/db/r/:key', proxyKeyRequest);
-app.get('/db/d/:key', proxyKeyRequest);
-
-
-app.use((req, res, next) => {
-    if (req.method === 'GET') {
-        req.body = {};
-    }
-    next();
-});
+app.post('/db/r', jsonParser, proxyKeyRequest);
+app.post('/db/d', jsonParser, proxyKeyRequest);
 
 app.use((req, res, next) => {
     if (isShuttingDown) {
@@ -74,7 +66,6 @@ async function proxyKeyRequest(req, res) {
         });
     }
 
-
     if (typeof rawKey === 'object') {
         rawKey = JSON.stringify(rawKey);
     } else {
@@ -98,16 +89,16 @@ async function proxyKeyRequest(req, res) {
 
     if (req.originalUrl.startsWith('/db/c')) {
         url = `${target}/key`;
-    } else if (req.originalUrl.startsWith('/db/r')) {
-        url = `${target}/key/${req.params.key}`;
-        method = 'get';
-        data = null;
     } else if (req.originalUrl.startsWith('/db/u')) {
         url = `${target}/key`;
+    } else if (req.originalUrl.startsWith('/db/r')) {
+        url = `${target}/key/read`;
+        method = 'post';
+        data = { key: rawKey };
     } else if (req.originalUrl.startsWith('/db/d')) {
-        url = `${target}/key/${req.params.key}`;
-        method = 'delete';
-        data = null;
+        url = `${target}/key/delete`;
+        method = 'post';
+        data = { key: rawKey };
     }
 
     try {
@@ -159,6 +150,7 @@ async function proxyKeyRequest(req, res) {
         });
     }
 }
+
 
 
 app.get('/stats', async (req, res) => {

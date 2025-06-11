@@ -35,6 +35,11 @@ const crudStats = {
     delete: 0
 };
 
+function normalizeKeyInput(rawKey) {
+    if (typeof rawKey === 'object') return JSON.stringify(rawKey);
+    return String(rawKey);
+}
+
 
 app.use((req, res, next) => {
     if (isShuttingDown) {
@@ -65,9 +70,11 @@ app.get('/whoami', (req, res) => {
 });
 
 app.post('/internal/prepare', jsonParser, async (req, res) => {
-    const { key, value, operation } = req.body;
+    let { key, value, operation } = req.body;
+    key = normalizeKeyInput(key);
+    if (typeof key === 'object') key = JSON.stringify(key);
+    const tmp = path.join(dataDir, `${md5(key)}.${operation}.prepare`);
     try {
-        const tmp = path.join(dataDir, `${md5(key)}.${operation}.prepare`);
         await fs.outputJson(tmp, { key, value });
         logger.info(`[${selfId}] 🟡 PREPARE ${operation} ${key}`);
         res.send({ status: 'ready' });
@@ -78,9 +85,11 @@ app.post('/internal/prepare', jsonParser, async (req, res) => {
 });
 
 app.post('/internal/commit', jsonParser, async (req, res) => {
-    const { key, operation } = req.body;
+    let { key, operation } = req.body;
+    key = normalizeKeyInput(key);
+    if (typeof key === 'object') key = JSON.stringify(key);
+    const tmp = path.join(dataDir, `${md5(key)}.${operation}.prepare`);
     try {
-        const tmp = path.join(dataDir, `${md5(key)}.${operation}.prepare`);
         const { value } = await fs.readJson(tmp);
         if (operation === 'create' || operation === 'update') {
             await store.saveKeyValue(dataDir, key, value);
@@ -99,9 +108,11 @@ app.post('/internal/commit', jsonParser, async (req, res) => {
 });
 
 app.post('/internal/abort', jsonParser, async (req, res) => {
-    const { key, operation } = req.body;
+    let { key, operation } = req.body;
+    key = normalizeKeyInput(key);
+    if (typeof key === 'object') key = JSON.stringify(key);
+    const tmp = path.join(dataDir, `${md5(key)}.${operation}.prepare`);
     try {
-        const tmp = path.join(dataDir, `${md5(key)}.${operation}.prepare`);
         await fs.remove(tmp);
         logger.warn(`[${selfId}] 🛑 ABORT ${operation} ${key}`);
         res.send({ status: 'aborted' });
@@ -112,7 +123,9 @@ app.post('/internal/abort', jsonParser, async (req, res) => {
 });
 
 
+
 async function twoPhaseCommit(followers, key, value, operation) {
+    key = normalizeKeyInput(key);
     const prepare = await Promise.allSettled(
         followers.map(url => axios.post(`${url}/internal/prepare`, { key, value, operation }, { timeout: 1500 }))
     );
@@ -130,7 +143,8 @@ async function twoPhaseCommit(followers, key, value, operation) {
 }
 
 app.post('/internal/replicate', jsonParser, async (req, res) => {
-    const { key, value } = req.body;
+    let { key, value } = req.body;
+    key = normalizeKeyInput(key);
     try {
         await store.saveKeyValue(dataDir, key, value);
         crudStats.create++;
@@ -143,7 +157,8 @@ app.post('/internal/replicate', jsonParser, async (req, res) => {
 });
 
 app.post('/internal/delete', jsonParser, async (req, res) => {
-    const { key } = req.body;
+    let { key } = req.body;
+    key = normalizeKeyInput(key);
     try {
         await store.deleteKeyValue(dataDir, key);
         crudStats.delete++;
@@ -254,6 +269,68 @@ app.get('/key/:key', async (req, res) => {
         res.status(500).json({ error: 1, message: err.message });
     }
 });
+
+app.post('/key/read', jsonParser, async (req, res) => {
+    let { key } = req.body;
+    if (!key) return res.status(400).json({ error: 1, message: 'Key required' });
+
+    key = normalizeKeyInput(key);
+
+    try {
+        const exists = await store.keyExists(dataDir, key);
+        if (!exists) {
+            return res.status(404).json({ error: 0, data: '❌ Key is not found' });
+        }
+
+        const data = await store.readKeyValue(dataDir, key);
+        crudStats.read++;
+        res.json(data);
+    } catch (err) {
+        logger.error(`[${selfId}] ❌ Reading error: ${err.message}`);
+        res.status(500).json({ error: 1, message: err.message });
+    }
+});
+
+
+
+app.post('/key/delete', redirectIfNotLeader, jsonParser, async (req, res) => {
+    let { key } = req.body;
+    if (!key) return res.status(400).json({ error: 1, message: 'Key required' });
+
+    key = normalizeKeyInput(key);
+
+    const nodeId = raft.getNodeId();
+    const node = require('../../configuration.json').nodes.find(n => n.id === nodeId);
+    const myUrl = `http://localhost:${PORT}`;
+    const followers = node.servers.map(s => `http://localhost:${s.port}`).filter(url => url !== myUrl);
+
+    const success = await twoPhaseCommit(followers, key, null, 'delete');
+    if (!success) {
+        return res.status(409).json({
+            resp: {
+                error: {
+                    code: 'eDELFAIL', errno: 409, message: 'prepare phase failed'
+                },
+                data: 0
+            }
+        });
+    }
+
+    await store.deleteKeyValue(dataDir, key);
+    crudStats.delete++;
+    res.json({
+        resp: {
+            error: 0,
+            data: {
+                message: 'Deleted and replicated',
+                key,
+                node: nodeId
+            }
+        }
+    });
+});
+
+
 
 app.delete('/key/:key', redirectIfNotLeader, async (req, res) => {
     const key = req.params.key;
